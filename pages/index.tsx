@@ -30,14 +30,14 @@ export default function Home() {
     } catch (error) {
       if (error instanceof Error) {
         toast(error.message);
-      }
-      console.log(error);
+      } else console.log(error);
     }
   };
 
   const connectWallet = useCallback(async () => {
     try {
       const provider = await getEthersWrappedProvider();
+      if (!provider) return;
       const signer = provider!.getSigner();
       const address = await signer.getAddress();
       const balance = await signer.getBalance();
@@ -45,6 +45,9 @@ export default function Home() {
       setUserAddress(address);
       setUserBalance(Number(utils.formatEther(balance)).toString());
       setChainId(chainId);
+
+      if (!localStorage.getItem("WEB3_CONNECT_CACHED_PROVIDER"))
+        localStorage.setItem("WEB3_CONNECT_CACHED_PROVIDER", "injected");
       setIsWalletConnected(true);
     } catch (error) {
       console.log(error);
@@ -71,6 +74,7 @@ export default function Home() {
     const updateAccountInformation = (accounts: string[]) => {
       if (!(accounts.length === 0)) {
         connectWallet();
+        localStorage.removeItem("WEB3_CONNECT_CACHED_PROVIDER");
       } else {
         setIsWalletConnected(false);
       }

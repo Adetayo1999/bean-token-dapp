@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { providers, Contract, utils } from "ethers";
+import { providers, Contract, utils, BigNumber } from "ethers";
 import { toast } from "react-toastify";
 import data from "../consts/data.json";
 
@@ -19,6 +19,7 @@ export const BuyBeanCoin = ({
   chainId,
 }: BuyBeanCoinProps) => {
   const [loading, setLoading] = useState(false);
+  const [userBNTBalance, setUserBNTBalance] = useState("");
   const [tokenValue, setTokenValue] = useState("");
   const [opTokenValue, setOpTokenValue] = useState(tokenValue);
   const [ethToPay, setEthToPay] = useState("");
@@ -43,10 +44,15 @@ export const BuyBeanCoin = ({
       toast(`${opTokenValue}BNT Bought Successfully 🚀 `);
       setTokenValue("");
       setLoading(false);
+      getUserBalance();
     } catch (error) {
-      console.error(error);
       setLoading(false);
-      toast(`Something went wrong: ${error}`);
+
+      if (error instanceof Error) {
+        if (error.message.includes("user rejected transaction"))
+          toast("Transaction Cancelled");
+        else toast(error.message);
+      } else toast(`Something went wrong: ${error}`);
     }
   };
 
@@ -56,7 +62,8 @@ export const BuyBeanCoin = ({
       const provider = await getWalletProvider();
       const { abi, address } = contractDetails[chainId!.toString()];
       const beanContract = new Contract(address, abi, provider);
-      const balance = await beanContract.balanceOf(userAddress);
+      const balance: BigNumber = await beanContract.balanceOf(userAddress);
+      setUserBNTBalance(utils.formatEther(balance));
     } catch (error) {
       console.error(error);
     } finally {
@@ -83,7 +90,7 @@ export const BuyBeanCoin = ({
           const { abi, address } = contractDetails[chainId.toString()];
           const beanContract = new Contract(address, abi, provider);
           const beanTokenEquivalentToEth: number =
-            Number((await beanContract.beanTokenPriceInEth()).toString()) /
+            Number((await beanContract.getBeanTokenPriceInEth()).toString()) /
             1e18;
           const ethToPay = Number(opTokenValue) * beanTokenEquivalentToEth;
           setEthToPay(ethToPay.toString());
@@ -121,8 +128,9 @@ export const BuyBeanCoin = ({
             onChange={(e) => setTokenValue(e.target.value)}
           />
           {isWalletConnected && (
-            <div className="text-xs text-gray-800 mt-1">
+            <div className="text-xs text-gray-800 mt-1 flex gap-x-5">
               <span>ETH: {userBalance}ETH</span>
+              {userBNTBalance && <span>BNT: {userBNTBalance}BNT</span>}
             </div>
           )}
         </div>
@@ -144,7 +152,12 @@ export const BuyBeanCoin = ({
         <button
           className="w-full h-10 py-1 px-3 bg-blue-600 rounded text-gray-50 text-sm font-semibold hover:bg-blue-500 transition"
           onClick={handleBuyBeanCoin}
-          disabled={!isWalletConnected || loading || !tokenValue}
+          disabled={
+            !isWalletConnected ||
+            loading ||
+            !tokenValue ||
+            Number(ethToPay) > Number(userBalance)
+          }
         >
           BUY NOW 😊
         </button>
